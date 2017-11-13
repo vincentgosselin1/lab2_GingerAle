@@ -1,0 +1,2 @@
+#This is to uninstall driver
+sudo rmmod Cam_driver

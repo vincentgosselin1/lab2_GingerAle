@@ -1,0 +1,1 @@
+cmd_/home/ens/AK82770/Documents/ele784/labo2/cam_driver/cam_driver.ko := ld -r -m elf_x86_64 -T ./scripts/module-common.lds --build-id  -o /home/ens/AK82770/Documents/ele784/labo2/cam_driver/cam_driver.ko /home/ens/AK82770/Documents/ele784/labo2/cam_driver/cam_driver.o /home/ens/AK82770/Documents/ele784/labo2/cam_driver/cam_driver.mod.o

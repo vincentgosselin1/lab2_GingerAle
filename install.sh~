@@ -1,0 +1,4 @@
+#THIS is to install the driver
+sudo insmod ./Cam_driver.ko
+
+
