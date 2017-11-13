@@ -58,6 +58,28 @@ static struct usb_class_driver class_driver = {
   .minor_base = DEV_MINOR,
 };
 
+static int __init cam_driver_init (void) {
+
+	int result;//for error catching
+
+	printk(KERN_WARNING "cam_driver, Installing USB driver\n");
+
+	result = usb_register(&cam_driver);
+	if(result){
+		printk(KERN_WARNING "cam_driver -> Init : usb_register failed. Error number is %d\n",result);
+		return result;
+	}
+
+    return 0;
+}
+
+static void __exit cam_driver_cleanup (void) {
+
+	printk(KERN_WARNING "cam_driver, Uninstalling USB driver\n");
+
+	usb_deregister(&cam_driver);
+
+}
 
 // Event when the device is opened
 int cam_driver_open(struct inode *inode, struct file *file) {
@@ -111,6 +133,6 @@ ssize_t cam_driver_read(struct file *file, char __user *buffer, size_t count, lo
   return 0;
 }
 
-//module_init(cam_driver_init);
-//module_exit(cam_driver_cleanup);
-module_usb_driver(cam_driver);
+module_init(cam_driver_init);
+module_exit(cam_driver_cleanup);
+//module_usb_driver(cam_driver);
