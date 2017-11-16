@@ -31,3 +31,4 @@ __used
 __attribute__((section(".modinfo"))) =
 "depends=";
 
+MODULE_ALIAS("usb:v046Dp08CCd*dc*dsc*dp*ic*isc*ip*in*");

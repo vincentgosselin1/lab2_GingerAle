@@ -1,5 +1,5 @@
 //Laboratoire #2 par Vincent Gosselin, 2017.
-//Webcam Driver for QuickCam® OrbitTM MP Logitech
+//Webcam Driver for QuickCam® Orbit MP Logitech
 
 #include <linux/module.h>
 #include <linux/init.h>
@@ -26,7 +26,8 @@
 MODULE_LICENSE("Dual BSD/GPL");
 
 static struct usb_device_id usb_device_id [] = {
-    {USB_DEVICE(0x0000, 0x0000)},
+    //{USB_DEVICE(0x0000, 0x0000)},
+	 {USB_DEVICE(0x046d, 0x08cc)},
     {},
 };
 MODULE_DEVICE_TABLE(usb, usb_device_id);
@@ -58,6 +59,7 @@ static struct usb_class_driver class_driver = {
   .minor_base = DEV_MINOR,
 };
 
+
 static int __init cam_driver_init (void) {
 
 	int result;//for error catching
@@ -65,7 +67,7 @@ static int __init cam_driver_init (void) {
 	printk(KERN_WARNING "cam_driver, Installing USB driver\n");
 
 	result = usb_register(&cam_driver);
-	if(result){
+	if(result<0){
 		printk(KERN_WARNING "cam_driver -> Init : usb_register failed. Error number is %d\n",result);
 		return result;
 	}
@@ -80,6 +82,7 @@ static void __exit cam_driver_cleanup (void) {
 	usb_deregister(&cam_driver);
 
 }
+
 
 // Event when the device is opened
 int cam_driver_open(struct inode *inode, struct file *file) {
@@ -103,10 +106,8 @@ int cam_driver_open(struct inode *inode, struct file *file) {
 int cam_driver_probe(struct usb_interface *interface, const struct usb_device_id *id) {
   struct usb_host_interface *iface_desc;
 
-  printk(KERN_INFO "cam_driver -> Probe\n");
-
-
-
+	//printk(KERN_INFO "cam_driver -> Probe\n");
+	printk(KERN_WARNING "cam_driver -> Probe\n");
 
   return 0;
 }
