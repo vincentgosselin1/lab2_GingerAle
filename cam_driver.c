@@ -27,7 +27,8 @@ MODULE_LICENSE("Dual BSD/GPL");
 
 static struct usb_device_id usb_device_id [] = {
     //{USB_DEVICE(0x0000, 0x0000)},
-	 {USB_DEVICE(0x046d, 0x08cc)},
+	//{USB_DEVICE(0x046d, 0x08cc)},
+	{USB_DEVICE(0x046d, 0x0994)},
     {},
 };
 MODULE_DEVICE_TABLE(usb, usb_device_id);
