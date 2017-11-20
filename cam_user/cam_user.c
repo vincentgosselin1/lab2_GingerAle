@@ -84,10 +84,32 @@ void execute(int choice){
 			fd = open("/dev/etsele_cdev", O_RDONLY);
 			if(fd<0){
 				printf("ERROR in OPENNING\r\n");
-				break;
 			}
 			//Close the file now.
 			int ret;
+			ret = close(fd);
+			if(ret<0){
+				printf("ERROR in closing\r\n");
+			}
+			break;
+		}
+		case 2 : 
+		{
+			//IOCTL_GET
+			printf("Testing file_operation IOCTL_GET \r\n");
+			//file descriptor used for driver interaction. 
+			int fd;
+			//Driver is called "etsele_cdev". 
+			fd = open("/dev/etsele_cdev", O_RDONLY);
+			if(fd<0){
+				printf("ERROR in OPENNING\r\n");
+			}
+			//Close the file now.
+			int ret;
+			unsigned long value;
+			ret = ioctl(fd,CAMERA_IOCTL_GET,&value);//2nd parameter is the command associated, 3rd is pointer t
+			printf("Return value is : %d\r\n",(int)value);
+			
 			ret = close(fd);
 			if(ret<0){
 				printf("ERROR in closing\r\n");
@@ -101,8 +123,10 @@ void execute(int choice){
 			break;	
 		}
 		default : 
+		{
 			printf("THIS IS NOT A VALID CHOICE\r\n");
 			break;
+		}
 	}
 }
 

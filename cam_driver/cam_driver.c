@@ -48,11 +48,35 @@ struct Cam_Dev {
 } CamCharDev;
 
 //structure pour binder les endpoints/alt-setting etc..
+//inspired from https://github.com/mavam/ml-driver/blob/master/ml_driver.c
 struct usb_skel {
-	struct usb_device usbdev;
+	struct usb_device * usbdev;
+	struct usb_interface * interface;
+	char minor;
+	char serial_number[8]; //maybe not used.
+
+	//access control
+	int open_count;
+	struct semaphore sem; //locks this structure
+	//spinlock required?
+	spinlock_t command_spinlock; //locks commands to send.
+
+	//BULK Endpoints, buffers, URB.
+	char *bulk_in_buffer;
+	struct usb_endpoint_descriptor *bulk_in_endpoint;
+	struct urb *bulk_in_urb;
+	int bulk_in_running;
+
+	//Control Endpoints, buffers, URB.
+	char *control_buffer; //8 bytes buffer for control messages.
+	struct urb *control_urb;
+	struct usb_control_request *control_direction; //packet information.
+	
+	/*
 	int bulk_in_endpointAddr;
 	int bulk_in_size;
 	char * bulk_in_buffer;
+	*/	
 };
 	
 
@@ -87,7 +111,7 @@ static struct usb_class_driver class_driver = {
   .minor_base = DEV_MINOR,
 };
 
-
+/*
 static int __init cam_driver_init (void) {
 
 	int result;//for error catching
@@ -100,6 +124,8 @@ static int __init cam_driver_init (void) {
 		return result;
 	}
 
+	//Doit se faire dans le probe.
+	/*
 	//Char driver
 	result = alloc_chrdev_region(&CamCharDev.devno,0,1,"MyChar_driver");
 	if(result){ CamCharDev.devno = MKDEV(250,0); }
@@ -108,10 +134,13 @@ static int __init cam_driver_init (void) {
 	cdev_init(&CamCharDev.char_driver_cdev, &fops);
 	CamCharDev.char_driver_cdev.owner = THIS_MODULE;
 
-		//init custom structures
+	//cam_driver structure init.
 	
 
+		//init custom structures
+
 	cdev_add(&CamCharDev.char_driver_cdev, CamCharDev.devno, 1);
+	
 
 	return 0;
 }
@@ -132,7 +161,7 @@ static void __exit cam_driver_cleanup (void) {
 	//kfree
 
 }
-
+*/
 
 // Event when the device is opened
 int cam_driver_open(struct inode *inode, struct file *file) {
@@ -170,30 +199,64 @@ int cam_driver_probe(struct usb_interface *interface, const struct usb_device_id
 
 	printk(KERN_WARNING "cam_driver -> Probe\n");
 
-	printk(KERN_WARNING "cam_driver -> num_altsetting is at : %d\n", interface->num_altsetting);
-	printk(KERN_WARNING "cam_driver -> extralen is at : %d\n", interface->cur_altsetting->extralen);
-	printk(KERN_WARNING "cam_driver -> extra is at : %s\n", interface->cur_altsetting->extra);
-	printk(KERN_WARNING "cam_driver -> string is at : %s\n", interface->cur_altsetting->string);
 
-	/*
+	printk(KERN_WARNING "cam_driver -> num_altsetting is at : %d\n", interface->num_altsetting);
+	//printk(KERN_WARNING "cam_driver -> extralen is at : %d\n", interface->cur_altsetting->extralen);
+	//printk(KERN_WARNING "cam_driver -> extra is at : %s\n", interface->cur_altsetting->extra);
+	//printk(KERN_WARNING "cam_driver -> string is at : %s\n", interface->cur_altsetting->string);
+
+		
+
 	camdev = kmalloc(sizeof(struct usb_skel), GFP_KERNEL);//alloue la structure locale du pilote.
 	camdev->usbdev = usb_get_dev(dev);
 
 	//Pour passer au travers des reglages alternatifs de l'interface
 	for(n=0; n<interface->num_altsetting; n++){
+
 		intf = &interface->altsetting[n];
 		altSetNum = intf->desc.bAlternateSetting;
-		printk(KERN_WARNING "cam_driver -> altSetNum is at : %d\n",altSetNum);
+		//printk(KERN_WARNING "cam_driver -> altSetNum is at : %d\n",altSetNum);
 		//Pour passer au travers des Endpoints de l'interface
 			for(m=0; m< intf->desc.bNumEndpoints; m++){
-				endpoint = *intf->endpoint[m].desc;
+				endpoint = &intf->endpoint[m].desc;
 
 				//Est-ce que le endpoint est de type BULK-IN??
 				//
-			
-			}			
-	}	
-	*/
+				//printk(KERN_WARNING "cam_driver -> bmAttributes is at : %d\n",endpoint->bmAttributes);
+				printk(KERN_WARNING "cam_driver -> endpoint->bEndpointAddress is at 0x%x\n",endpoint->bEndpointAddress);
+				printk(KERN_WARNING "cam_driver -> endpoint->bmAttributes is at 0x%x\n",endpoint->bmAttributes);
+				
+				/*
+				if((endpoint->bEndpointAddress & USB_DIR_IN) && ((endpoint->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) == USB_ENDPOINT_XFER_BULK)) {
+					printk(KERN_WARNING "cam_driver -> HERE IS A BULK IN ENDPOINT\n");
+				}*/
+
+				/*
+				if (((endpoint->bEndpointAddress & USB_ENDPOINT_DIR_MASK) == USB_DIR_IN) && 
+						((endpoint->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) == USB_ENDPOINT_XFER_BULK)){
+					printk(KERN_WARNING "cam_driver -> HERE IS A BULK IN ENDPOINT\n");
+				}
+				*/
+				
+				if((endpoint->bEndpointAddress & USB_ENDPOINT_DIR_MASK) == USB_DIR_IN){
+					printk(KERN_WARNING "cam_driver -> ENDPOINT IS DIR IN\n");
+				}
+				if((endpoint->bEndpointAddress & USB_ENDPOINT_DIR_MASK) == USB_DIR_OUT){
+					printk(KERN_WARNING "cam_driver -> ENDPOINT IS DIR OUT\n");
+				}
+				if((endpoint->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) == USB_ENDPOINT_XFER_BULK){
+					//looks like BULK IN endpoint doesnt exist...
+					printk(KERN_WARNING "cam_driver -> ENDPOINT is BULK\n");
+				}
+								
+
+
+			}//endpoint loop			
+	}//interface loop	
+	
+
+	//Control Interface.
+	//intf = &interface->altsetting[0];
 	
 
 	//printk(KERN_WARNING "cam_driver -> Probe\n");
@@ -262,6 +325,6 @@ ssize_t cam_driver_read(struct file *file, char __user *buffer, size_t count, lo
   return 0;
 }
 
-module_init(cam_driver_init);
-module_exit(cam_driver_cleanup);
-//module_usb_driver(cam_driver);
+//module_init(cam_driver_init);
+//module_exit(cam_driver_cleanup);
+module_usb_driver(cam_driver);
