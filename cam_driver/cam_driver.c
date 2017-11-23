@@ -271,11 +271,35 @@ long cam_driver_ioctl(struct file *file, unsigned int cmd, unsigned long arg) {
 			printk(KERN_WARNING "cam_driver -> CAMERA_IOCTL_SET\n");
 			break;
 		case CAMERA_IOCTL_STREAMON:
+			{
 			printk(KERN_WARNING "cam_driver -> CAMERA_IOCTL_STREAMON\n");
+			unsigned long user_command,pipe;
+			printk(KERN_WARNING "cam_driver -> dev->devnum is at : %d\n",dev->devnum);
+			ret = __get_user(tmp, (int __user *)arg);
+			user_command = tmp;
+			printk(KERN_WARNING "cam_driver -> User sends : 0x%x\n",user_command);
+			pipe = usb_sndctrlpipe(dev, 0);
+			printk(KERN_WARNING "cam_driver -> Pipe is : 0x%x\n",pipe);
+			usb_control_msg(dev, pipe, 0x0b, 
+									USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_INTERFACE, 
+									0x0004, 0x0001, NULL, 0, 0);
 			break;
+			}
 		case CAMERA_IOCTL_STREAMOFF:
+			{
 			printk(KERN_WARNING "cam_driver -> CAMERA_IOCTL_STREAMOFF\n");
+			unsigned long user_command,pipe;
+			printk(KERN_WARNING "cam_driver -> dev->devnum is at : %d\n",dev->devnum);
+			ret = __get_user(tmp, (int __user *)arg);
+			user_command = tmp;
+			printk(KERN_WARNING "cam_driver -> User sends : 0x%x\n",user_command);
+			pipe = usb_sndctrlpipe(dev, 0);
+			printk(KERN_WARNING "cam_driver -> Pipe is : 0x%x\n",pipe);
+			usb_control_msg(dev, pipe, 0x0b, 
+									USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_INTERFACE, 
+									0x0000, 0x0001, NULL, 0, 0);
 			break;
+			}
 		case CAMERA_IOCTL_GRAB:
 			printk(KERN_WARNING "cam_driver -> CAMERA_IOCTL_GRAB\n");
 			break;

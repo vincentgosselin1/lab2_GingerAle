@@ -127,6 +127,61 @@ void execute(int choice){
 			}
 			break;
 		}
+		case 4 : 
+		{
+			//IOCTL_STREAMON
+			printf("Testing file_operation IOCTL_STREAMON\r\n");
+			//file descriptor used for driver interaction. 
+			int fd;
+			//Driver is called "etsele_cdev". 
+			//fd = open("/dev/etsele_cdev", O_RDONLY);
+			fd = open("/dev/etsele_cdev", O_RDWR);
+			if(fd<0){
+				printf("ERROR in OPENNING\r\n");
+			}
+			//Close the file now.
+			int ret;
+			unsigned long value;//4 bytes -> 32bits.
+			value = 0xffff;
+			ret = ioctl(fd,CAMERA_IOCTL_STREAMON ,&value);//2nd parameter is the command associated, 3rd is pointer to unsigned long
+			printf("Return value is : %d\r\n",(int)value);
+			
+			ret = close(fd);
+			if(ret<0){
+				printf("ERROR in closing\r\n");
+			}
+			break;
+		}
+		case 5 : 
+		{
+			//IOCTL_STREAMOff
+			printf("Testing file_operation IOCTL_STREAMOFF\r\n");
+			//file descriptor used for driver interaction. 
+			int fd;
+			//Driver is called "etsele_cdev". 
+			//fd = open("/dev/etsele_cdev", O_RDONLY);
+			fd = open("/dev/etsele_cdev", O_RDWR);
+			if(fd<0){
+				printf("ERROR in OPENNING\r\n");
+			}
+			//Close the file now.
+			int ret;
+			unsigned long value;//4 bytes -> 32bits.
+			value = 0xaaaa;
+			ret = ioctl(fd,CAMERA_IOCTL_STREAMOFF ,&value);//2nd parameter is the command associated, 3rd is pointer to unsigned long
+			printf("Return value is : %d\r\n",(int)value);
+			
+			ret = close(fd);
+			if(ret<0){
+				printf("ERROR in closing\r\n");
+			}
+			break;
+		}
+		case 6 : 
+		{
+			//IOCTL_GRAB
+			
+		}
 		case 7 : 
 		{
 			//IOCTL_PANTILT RIGHT
