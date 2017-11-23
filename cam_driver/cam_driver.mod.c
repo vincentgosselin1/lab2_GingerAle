@@ -35,8 +35,8 @@ __attribute__((section("__versions"))) = {
 	{ 0xedc1a25a, __VMLINUX_SYMBOL_STR(kmem_cache_alloc_trace) },
 	{ 0x10380b27, __VMLINUX_SYMBOL_STR(kmalloc_caches) },
 	{ 0x7da51b40, __VMLINUX_SYMBOL_STR(usb_deregister_dev) },
-	{ 0x473fe3a3, __VMLINUX_SYMBOL_STR(usb_control_msg) },
 	{ 0x4c4fef19, __VMLINUX_SYMBOL_STR(kernel_stack) },
+	{ 0x473fe3a3, __VMLINUX_SYMBOL_STR(usb_control_msg) },
 	{ 0xdf497eac, __VMLINUX_SYMBOL_STR(usb_find_interface) },
 	{ 0x27e1a049, __VMLINUX_SYMBOL_STR(printk) },
 	{ 0xbdfb6dbb, __VMLINUX_SYMBOL_STR(__fentry__) },
@@ -47,4 +47,4 @@ __used
 __attribute__((section(".modinfo"))) =
 "depends=";
 
-MODULE_ALIAS("usb:v046Dp08CCd*dc*dsc*dp*ic*isc*ip*in*");
+MODULE_ALIAS("usb:v046Dp0994d*dc*dsc*dp*ic*isc*ip*in*");

@@ -53,15 +53,18 @@ void display_welcome(){
 void display_menu(){
 	printf("Camera driver to use QuickCam® Orbit MP Logitech\r\n");
 	printf("What do you want to do?\r\n");
-	printf("1. Open driver in READ\r\n");
-	printf("2. IOCTL_GET\r\n");
-	printf("3. IOCTL_SET\r\n");
-	printf("4. IOCTL_STREAMON\r\n");
-	printf("5. IOCTL_STREAMOFF\r\n");
-	printf("6. IOCTL_GRAB\r\n");
-	printf("7. IOCTL_PANTILT\r\n");
-	printf("8. IOCTL_PANTILT_RESET\r\n");
-	printf("9. Exit the program \r\n");
+	printf("1.  Open driver in READ\r\n");
+	printf("2.  IOCTL_GET\r\n");
+	printf("3.  IOCTL_SET\r\n");
+	printf("4.  IOCTL_STREAMON\r\n");
+	printf("5.  IOCTL_STREAMOFF\r\n");
+	printf("6.  IOCTL_GRAB\r\n");
+	printf("7.  IOCTL_PANTILT RIGHT\r\n");
+	printf("8.  IOCTL_PANTILT LEFT\r\n");
+	printf("9.  IOCTL_PANTILT UP\r\n");
+	printf("10. IOCTL_PANTILT DOWN\r\n");
+	printf("11. IOCTL_PANTILT_RESET\r\n");
+	printf("12. Exit the program \r\n");
 	
 }
 
@@ -126,21 +129,19 @@ void execute(int choice){
 		}
 		case 7 : 
 		{
-			//IOCTL_PANTILT
-			printf("Testing file_operation IOCTL_PANTILT\r\n");
+			//IOCTL_PANTILT RIGHT
+			printf("Testing file_operation IOCTL_PANTILT RIGHT\r\n");
 			//file descriptor used for driver interaction. 
 			int fd;
 			//Driver is called "etsele_cdev". 
-			fd = open("/dev/etsele_cdev", O_RDONLY);
+			//fd = open("/dev/etsele_cdev", O_RDONLY);
+			fd = open("/dev/etsele_cdev", O_RDWR);
 			if(fd<0){
 				printf("ERROR in OPENNING\r\n");
 			}
 			//Close the file now.
 			int ret;
-			//direction droite 0x80,0xff,0x00,0x00
-			//                 0x00,0x00,0xff,0x80
 			unsigned long value;//4 bytes -> 32bits.
-			//value = 0x80ff0000;
 			value = 0x0000ff80;
 			ret = ioctl(fd,CAMERA_IOCTL_PANTILT ,&value);//2nd parameter is the command associated, 3rd is pointer to unsigned long
 			printf("Return value is : %d\r\n",(int)value);
@@ -151,8 +152,106 @@ void execute(int choice){
 			}
 			break;
 		}
+		case 8 : 
+		{
+			//IOCTL_PANTILT
+			printf("Testing file_operation IOCTL_PANTILT LEFT\r\n");
+			//file descriptor used for driver interaction. 
+			int fd;
+			//Driver is called "etsele_cdev". 
+			fd = open("/dev/etsele_cdev", O_RDWR);
+			if(fd<0){
+				printf("ERROR in OPENNING\r\n");
+			}
+			//Close the file now.
+			int ret;
+			unsigned long value;//4 bytes -> 32bits.
+			value = 0x00000080;
+			ret = ioctl(fd,CAMERA_IOCTL_PANTILT ,&value);//2nd parameter is the command associated, 3rd is pointer to unsigned long
+			printf("Return value is : %d\r\n",(int)value);
+			
+			ret = close(fd);
+			if(ret<0){
+				printf("ERROR in closing\r\n");
+			}
+			break;
+		}
+		case 9 : 
+		{
+			//IOCTL_PANTILT
+			printf("Testing file_operation IOCTL_PANTILT UP\r\n");
+			//file descriptor used for driver interaction. 
+			int fd;
+			//Driver is called "etsele_cdev". 
+			fd = open("/dev/etsele_cdev", O_RDWR);
+			if(fd<0){
+				printf("ERROR in OPENNING\r\n");
+			}
+			//Close the file now.
+			int ret;
+			unsigned long value;//4 bytes -> 32bits.
+			value = 0xff800000;
+			ret = ioctl(fd,CAMERA_IOCTL_PANTILT ,&value);//2nd parameter is the command associated, 3rd is pointer to unsigned long
+			printf("Return value is : %d\r\n",(int)value);
+			
+			ret = close(fd);
+			if(ret<0){
+				printf("ERROR in closing\r\n");
+			}
+			break;
+		}
+		case 10 : 
+		{
+			//IOCTL_PANTILT
+			printf("Testing file_operation IOCTL_PANTILT DOWN\r\n");
+			//file descriptor used for driver interaction. 
+			int fd;
+			//Driver is called "etsele_cdev". 
+			fd = open("/dev/etsele_cdev", O_RDWR);
+			if(fd<0){
+				printf("ERROR in OPENNING\r\n");
+			}
+			//Close the file now.
+			int ret;
+			unsigned long value;//4 bytes -> 32bits.
+			value = 0x00800000;
+			ret = ioctl(fd,CAMERA_IOCTL_PANTILT ,&value);//2nd parameter is the command associated, 3rd is pointer to unsigned long
+			printf("Return value is : %d\r\n",(int)value);
+			
+			ret = close(fd);
+			if(ret<0){
+				printf("ERROR in closing\r\n");
+			}
+			break;
+		}
+		case 11 : 
+		{
+			//IOCTL_PANTILT_RESET
+			printf("Testing file_operation IOCTL_PANTILT_RESET\r\n");
+			//file descriptor used for driver interaction. 
+			int fd;
+			//Driver is called "etsele_cdev". 
+			fd = open("/dev/etsele_cdev", O_RDWR);
+			if(fd<0){
+				printf("ERROR in OPENNING\r\n");
+			}
+			//Close the file now.
+			int ret;
+			//direction droite 0x80,0xff,0x00,0x00
+			//                 0x00,0x00,0xff,0x80
+			unsigned long value;//4 bytes -> 32bits.
+			value = 0x03;
+			ret = ioctl(fd,CAMERA_IOCTL_PANTILT ,&value);//2nd parameter is the command associated, 3rd is pointer to unsigned long
+			printf("Return value is : %d\r\n",(int)value);
+			
+			ret = close(fd);
+			if(ret<0){
+				printf("ERROR in closing\r\n");
+			}
+			break;
+		}
 		// to Exit the program
-		case 9 :	
+		case 12 :	
 		{
 			operation_done = 1;
 			break;	
