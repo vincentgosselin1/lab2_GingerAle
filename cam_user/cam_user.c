@@ -85,8 +85,16 @@ void execute(int choice){
 			if(fd<0){
 				printf("ERROR in OPENNING\r\n");
 			}
+			int ret;//return value of every read.
+			ret = read(fd, user_text_output, 1);
+			if(ret>0){ 
+				printf("Success in READING %d bytes\r\n",ret); 
+			} else {
+				printf("ERROR in READING\r\n");
+			}
+
 			//Close the file now.
-			int ret;
+			//int ret;
 			ret = close(fd);
 			if(ret<0){
 				printf("ERROR in closing\r\n");
@@ -108,6 +116,33 @@ void execute(int choice){
 			int ret;
 			unsigned long value;
 			ret = ioctl(fd,CAMERA_IOCTL_GET,&value);//2nd parameter is the command associated, 3rd is pointer t
+			printf("Return value is : %d\r\n",(int)value);
+			
+			ret = close(fd);
+			if(ret<0){
+				printf("ERROR in closing\r\n");
+			}
+			break;
+		}
+		case 7 : 
+		{
+			//IOCTL_PANTILT
+			printf("Testing file_operation IOCTL_PANTILT\r\n");
+			//file descriptor used for driver interaction. 
+			int fd;
+			//Driver is called "etsele_cdev". 
+			fd = open("/dev/etsele_cdev", O_RDONLY);
+			if(fd<0){
+				printf("ERROR in OPENNING\r\n");
+			}
+			//Close the file now.
+			int ret;
+			//direction droite 0x80,0xff,0x00,0x00
+			//                 0x00,0x00,0xff,0x80
+			unsigned long value;//4 bytes -> 32bits.
+			//value = 0x80ff0000;
+			value = 0x0000ff80;
+			ret = ioctl(fd,CAMERA_IOCTL_PANTILT ,&value);//2nd parameter is the command associated, 3rd is pointer to unsigned long
 			printf("Return value is : %d\r\n",(int)value);
 			
 			ret = close(fd);

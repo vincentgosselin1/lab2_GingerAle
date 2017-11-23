@@ -822,6 +822,7 @@ deps_/home/ens/AK82770/Documents/ele784/labo2/cam_driver/cam_driver.o := \
   include/linux/pm_runtime.h \
   include/uapi/linux/usb/video.h \
   /home/ens/AK82770/Documents/ele784/labo2/cam_driver/camera_ioctl.h \
+  /home/ens/AK82770/Documents/ele784/labo2/cam_driver/usbvideo.h \
 
 /home/ens/AK82770/Documents/ele784/labo2/cam_driver/cam_driver.o: $(deps_/home/ens/AK82770/Documents/ele784/labo2/cam_driver/cam_driver.o)
 

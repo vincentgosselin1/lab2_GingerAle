@@ -24,6 +24,8 @@
 #include <asm/ioctl.h>
 #include "camera_ioctl.h"
 
+#include "usbvideo.h"
+
 //#define DEV_MAJOR 250
 //#define DEV_MINOR	0
 #define DEV_MINOR       0x00
@@ -33,8 +35,8 @@ MODULE_LICENSE("Dual BSD/GPL");
 
 static struct usb_device_id usb_device_id [] = {
     //{USB_DEVICE(0x0000, 0x0000)},
-	//{USB_DEVICE(0x046d, 0x08cc)},
-	{USB_DEVICE(0x046d, 0x0994)},
+	{USB_DEVICE(0x046d, 0x08cc)},
+//	{USB_DEVICE(0x046d, 0x0994)},
     {},
 };
 MODULE_DEVICE_TABLE(usb, usb_device_id);
@@ -48,7 +50,6 @@ struct Cam_Dev {
 } CamCharDev;
 
 //structure pour binder les endpoints/alt-setting etc..
-//inspired from https://github.com/mavam/ml-driver/blob/master/ml_driver.c
 struct usb_skel {
 	struct usb_device * usbdev;
 	struct usb_interface * interface;
@@ -111,7 +112,7 @@ static struct usb_class_driver class_driver = {
   .minor_base = DEV_MINOR,
 };
 
-/*
+
 static int __init cam_driver_init (void) {
 
 	int result;//for error catching
@@ -125,7 +126,7 @@ static int __init cam_driver_init (void) {
 	}
 
 	//Doit se faire dans le probe.
-	/*
+	
 	//Char driver
 	result = alloc_chrdev_region(&CamCharDev.devno,0,1,"MyChar_driver");
 	if(result){ CamCharDev.devno = MKDEV(250,0); }
@@ -161,7 +162,7 @@ static void __exit cam_driver_cleanup (void) {
 	//kfree
 
 }
-*/
+
 
 // Event when the device is opened
 int cam_driver_open(struct inode *inode, struct file *file) {
@@ -195,73 +196,78 @@ int cam_driver_probe(struct usb_interface *interface, const struct usb_device_id
 	struct usb_device *dev = interface_to_usbdev(interface);//recupere la structure du pilote USB.
 	//struct usb_cam
 	struct usb_skel *camdev = NULL;
-	int n, m, altSetNum, activeInterface = -1; 
+	int n, m, altSetNum = -1;//, activeInterface = -1; 
 
 	printk(KERN_WARNING "cam_driver -> Probe\n");
 
-
-	printk(KERN_WARNING "cam_driver -> num_altsetting is at : %d\n", interface->num_altsetting);
-	//printk(KERN_WARNING "cam_driver -> extralen is at : %d\n", interface->cur_altsetting->extralen);
-	//printk(KERN_WARNING "cam_driver -> extra is at : %s\n", interface->cur_altsetting->extra);
-	//printk(KERN_WARNING "cam_driver -> string is at : %s\n", interface->cur_altsetting->string);
-
-		
-
+	/*	
 	camdev = kmalloc(sizeof(struct usb_skel), GFP_KERNEL);//alloue la structure locale du pilote.
 	camdev->usbdev = usb_get_dev(dev);
+	*/
 
 	//Pour passer au travers des reglages alternatifs de l'interface
 	for(n=0; n<interface->num_altsetting; n++){
 
 		intf = &interface->altsetting[n];
 		altSetNum = intf->desc.bAlternateSetting;
-		//printk(KERN_WARNING "cam_driver -> altSetNum is at : %d\n",altSetNum);
 		//Pour passer au travers des Endpoints de l'interface
 			for(m=0; m< intf->desc.bNumEndpoints; m++){
 				endpoint = &intf->endpoint[m].desc;
 
-				//Est-ce que le endpoint est de type BULK-IN??
-				//
-				//printk(KERN_WARNING "cam_driver -> bmAttributes is at : %d\n",endpoint->bmAttributes);
-				printk(KERN_WARNING "cam_driver -> endpoint->bEndpointAddress is at 0x%x\n",endpoint->bEndpointAddress);
-				printk(KERN_WARNING "cam_driver -> endpoint->bmAttributes is at 0x%x\n",endpoint->bmAttributes);
-				
 				/*
-				if((endpoint->bEndpointAddress & USB_DIR_IN) && ((endpoint->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) == USB_ENDPOINT_XFER_BULK)) {
-					printk(KERN_WARNING "cam_driver -> HERE IS A BULK IN ENDPOINT\n");
-				}*/
+				//For Video Streaming
+				if(((endpoint->bEndpointAddress & USB_ENDPOINT_DIR_MASK) == USB_DIR_IN) && 
+						((endpoint->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) == USB_ENDPOINT_XFER_ISOC) && 
+							(intf->desc.bInterfaceNumber == 1) && altSetNum == 4){
 
-				/*
-				if (((endpoint->bEndpointAddress & USB_ENDPOINT_DIR_MASK) == USB_DIR_IN) && 
-						((endpoint->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) == USB_ENDPOINT_XFER_BULK)){
-					printk(KERN_WARNING "cam_driver -> HERE IS A BULK IN ENDPOINT\n");
+							//found Isochronus endpoint for transfers.
+							printk(KERN_WARNING "cam_driver -> ENDPOINT IS DIR IN\n");
+							printk(KERN_WARNING "cam_driver -> ENDPOINT is ISOCHRONUS\n");
+							printk(KERN_WARNING "cam_driver -> endpoint->bEndpointAddress is at 0x%x\n",endpoint->bEndpointAddress);
+							printk(KERN_WARNING "cam_driver -> endpoint->bmAttributes is at 0x%x\n",endpoint->bmAttributes);
+							printk(KERN_WARNING "cam_driver -> intf->desc.bInterfaceNumber is at 0x%x\n",intf->desc.bInterfaceNumber);
+							printk(KERN_WARNING "cam_driver -> altSetNum is at 0x%x\n",altSetNum);
+							printk(KERN_WARNING "cam_driver -> dev->devnum is at : %d\n",dev->devnum);
+
+							camdev = kmalloc(sizeof(struct usb_skel), GFP_KERNEL);//alloue la structure locale du pilote.
+							camdev->usbdev = usb_get_dev(dev);
+
+							usb_set_intfdata(interface,camdev);
+							usb_register_dev(interface,&class_driver);
+							usb_set_interface(dev, intf->desc.bInterfaceNumber, altSetNum);
+							 
+
+							//return 0;//found Isochronus endpoint for transfers.
 				}
 				*/
-				
-				if((endpoint->bEndpointAddress & USB_ENDPOINT_DIR_MASK) == USB_DIR_IN){
-					printk(KERN_WARNING "cam_driver -> ENDPOINT IS DIR IN\n");
-				}
-				if((endpoint->bEndpointAddress & USB_ENDPOINT_DIR_MASK) == USB_DIR_OUT){
-					printk(KERN_WARNING "cam_driver -> ENDPOINT IS DIR OUT\n");
-				}
-				if((endpoint->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) == USB_ENDPOINT_XFER_BULK){
-					//looks like BULK IN endpoint doesnt exist...
-					printk(KERN_WARNING "cam_driver -> ENDPOINT is BULK\n");
+				//For VideoControl
+				//if(((endpoint->bEndpointAddress & USB_ENDPOINT_DIR_MASK) == USB_DIR_IN) && 
+				//		((endpoint->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) == USB_ENDPOINT_XFER_ISOC) && 
+							(interface->altsetting->desc.bInterfaceSubClass == SC_VIDEOCONTROL){
+
+							//found Isochronus endpoint for transfers.
+							printk(KERN_WARNING "cam_driver -> VideoControl\n");
+							printk(KERN_WARNING "cam_driver -> endpoint->bEndpointAddress is at 0x%x\n",endpoint->bEndpointAddress);
+							printk(KERN_WARNING "cam_driver -> endpoint->bmAttributes is at 0x%x\n",endpoint->bmAttributes);
+							printk(KERN_WARNING "cam_driver -> intf->desc.bInterfaceNumber is at 0x%x\n",intf->desc.bInterfaceNumber);
+							printk(KERN_WARNING "cam_driver -> altSetNum is at 0x%x\n",altSetNum);
+							printk(KERN_WARNING "cam_driver -> dev->devnum is at : %d\n",dev->devnum);
+
+							camdev = kmalloc(sizeof(struct usb_skel), GFP_KERNEL);//alloue la structure locale du pilote.
+							camdev->usbdev = usb_get_dev(dev);
+
+							usb_set_intfdata(interface,camdev);
+							usb_register_dev(interface,&class_driver);
+							usb_set_interface(dev, intf->desc.bInterfaceNumber, altSetNum);
+							 
+
+							return 0;//found VideoControl
 				}
 								
 
 
 			}//endpoint loop			
 	}//interface loop	
-	
-
-	//Control Interface.
-	//intf = &interface->altsetting[0];
-	
-
-	//printk(KERN_WARNING "cam_driver -> Probe\n");
-
-	//printk(KERN_WARNING "cam_driver -> usb_interface \n");
 
   return 0;
 }
@@ -274,7 +280,7 @@ void cam_driver_disconnect (struct usb_interface *intf) {
 
 long cam_driver_ioctl(struct file *file, unsigned int cmd, unsigned long arg) {
   struct usb_interface *interface = file->private_data;
-  struct usb_device *udev = interface_to_usbdev(interface);
+  struct usb_device *dev = interface_to_usbdev(interface);
 	
 	int err = 0;
 	int tmp,ret;
@@ -306,8 +312,26 @@ long cam_driver_ioctl(struct file *file, unsigned int cmd, unsigned long arg) {
 			printk(KERN_WARNING "cam_driver -> CAMERA_IOCTL_GRAB\n");
 			break;
 		case CAMERA_IOCTL_PANTILT:
+			{
 			printk(KERN_WARNING "cam_driver -> CAMERA_IOCTL_PANTILT\n");
+			//moving motors.
+			unsigned long user_command,pipe;
+			/*
+			int usb_control_msg(struct usb_device *dev, unsigned int pipe, __u8 request,
+		    __u8 requesttype, __u16 value, __u16 index, void *data,
+		    __u16 size, int timeout)*/
+			printk(KERN_WARNING "cam_driver -> dev->devnum is at : %d\n",dev->devnum);
+			ret = __get_user(tmp, (int __user *)arg);
+			user_command = tmp;
+			printk(KERN_WARNING "cam_driver -> User sends : 0x%x\n",user_command);
+			pipe = usb_sndctrlpipe(dev, 0);
+			//pipe = 0x00000800;
+			printk(KERN_WARNING "cam_driver -> Pipe is : 0x%x\n",pipe);
+			usb_control_msg(dev, pipe, 0x01, 
+									USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE, 
+									0x0100, 0x0900, &user_command, 4, 0);
 			break;
+			}
 		case CAMERA_IOCTL_PANTILT_RESET:
 			printk(KERN_WARNING "cam_driver -> CAMERA_IOCTL_PANTILT_RESET\n");
 			break;
@@ -325,6 +349,6 @@ ssize_t cam_driver_read(struct file *file, char __user *buffer, size_t count, lo
   return 0;
 }
 
-//module_init(cam_driver_init);
-//module_exit(cam_driver_cleanup);
-module_usb_driver(cam_driver);
+module_init(cam_driver_init);
+module_exit(cam_driver_cleanup);
+//module_usb_driver(cam_driver);
