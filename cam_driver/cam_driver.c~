@@ -70,6 +70,9 @@ struct usb_skel {
 	int iso_in_size;
 	int iso_in_endpointAddr;
 	char *iso_in_buffer;
+	unsigned int myStatus, myLenght, myLenghtUsed;
+	char *myData;
+	
 
 	//Control Endpoints, buffers, URB.
 	char *control_buffer; //8 bytes buffer for control messages.
@@ -175,6 +178,7 @@ int cam_driver_open(struct inode *inode, struct file *file) {
     printk(KERN_WARNING "cam_driver -> Open: Ne peux ouvrir le peripherique\n");
     return -ENODEV;
   }
+	
 
   file->private_data = intf;
   return 0;
@@ -234,6 +238,10 @@ int cam_driver_probe(struct usb_interface *interface, const struct usb_device_id
 
 							camdev->iso_in_buffer = kmalloc(sizeof(camdev->iso_in_size), GFP_KERNEL);
 
+							//init des variables pour CALLBACK?
+							//camdev->myStatus = 0;
+							camdev->
+
 							usb_set_intfdata(interface,camdev);
 							usb_register_dev(interface,&class_driver);
 							usb_set_interface(dev, intf->desc.bInterfaceNumber, altSetNum);
@@ -255,6 +263,71 @@ void cam_driver_disconnect (struct usb_interface *intf) {
 
   usb_deregister_dev(intf, &class_driver);
 }
+
+static void complete_callback(struct urb *urb){
+
+	int ret;
+	int i;	
+	unsigned char * data;
+	unsigned int len;
+	unsigned int maxlen;
+	unsigned int nbytes;
+	void * mem;
+
+	printk(KERN_WARNING "cam_driver -> complete_callback\n");
+
+	if(urb->status == 0){
+		
+		for (i = 0; i < urb->number_of_packets; ++i) {
+			if(myStatus == 1){
+				continue;
+			}
+			if (urb->iso_frame_desc[i].status < 0) {
+				continue;
+			}
+			
+			data = urb->transfer_buffer + urb->iso_frame_desc[i].offset;
+			if(data[1] & (1 << 6)){
+				continue;
+			}
+			len = urb->iso_frame_desc[i].actual_length;
+			if (len < 2 || data[0] < 2 || data[0] > len){
+				continue;
+			}
+		
+			len -= data[0];
+			maxlen = myLength - myLengthUsed ;
+			mem = myData + myLengthUsed;
+			nbytes = min(len, maxlen);
+			memcpy(mem, data + data[0], nbytes);
+			myLengthUsed += nbytes;
+	
+			if (len > maxlen) {				
+				myStatus = 1; // DONE
+			}
+	
+			//Mark the buffer as done if the EOF marker is set. 
+			
+			if ((data[1] & (1 << 1)) && (myLengthUsed != 0)) {						
+				myStatus = 1; // DONE
+			}					
+		}
+	
+		if (!(myStatus == 1)){				
+			if ((ret = usb_submit_urb(urb, GFP_ATOMIC)) < 0) {
+				//printk(KERN_WARNING "");
+			}
+		}else{
+			///////////////////////////////////////////////////////////////////////
+			//  Synchronisation
+			///////////////////////////////////////////////////////////////////////
+		}			
+	}else{
+		//printk(KERN_WARNING "");
+	}
+	
+}
+
 
 long cam_driver_ioctl(struct file *file, unsigned int cmd, unsigned long arg) {
   struct usb_interface *interface = file->private_data;
@@ -314,14 +387,17 @@ long cam_driver_ioctl(struct file *file, unsigned int cmd, unsigned long arg) {
 			}
 		case CAMERA_IOCTL_GRAB:
 			{
-			printk(KERN_WARNING "cam_driver -> CAMERA_IOCTL_GRAB\n");
+			
+		
 			//Init URB
-			{
 				struct usb_host_interface * cur_altsetting;
 				struct usb_endpoint_descriptor endpointDesc;
-				struct urb myUrb[5];
-				
-				int nbPackets, myPacketSize,size,nbUrbs;
+				struct urb * myUrb[5];
+				int nbPackets, myPacketSize,size,nbUrbs,i,j;
+				dma_addr_t *dma = NULL;	
+					
+				printk(KERN_WARNING "cam_driver -> CAMERA_IOCTL_GRAB\n");			
+
 				cur_altsetting = interface->cur_altsetting;
 				endpointDesc = cur_altsetting->endpoint[0].desc;
 
@@ -330,8 +406,7 @@ long cam_driver_ioctl(struct file *file, unsigned int cmd, unsigned long arg) {
 				printk(KERN_WARNING "cam_driver -> myPacketSize is at : %d\n",myPacketSize);			
 				size = myPacketSize * nbPackets;
 				nbUrbs = 5;
-
-				//camdev has URB in its structure.
+				
 
 				for (i = 0; i < nbUrbs; ++i) {
 					usb_free_urb(myUrb[i]); // Pour être certain
@@ -340,30 +415,28 @@ long cam_driver_ioctl(struct file *file, unsigned int cmd, unsigned long arg) {
 				 	 if (myUrb[i] == NULL) {
 					 	//printk(KERN_WARNING "");		
 						 return -ENOMEM;
-				  	}
+				  		}
 					
-				  //Isochronus transfer does not require usb_buffer_alloc, since not DMA.
-					/*
-				  myUrb[i]->transfer_buffer = usb_buffer_alloc(dev->udev,);
+
+					
+				//  myUrb[i]->transfer_buffer = usb_buffer_alloc(dev->udev,);
+					myUrb[i]->transfer_buffer = usb_alloc_coherent(dev,myPacketSize,GFP_ATOMIC,dma);
 
 				  if (myUrb[i]->transfer_buffer == NULL) {
 					 //printk(KERN_WARNING "");		
 					 usb_free_urb(myUrb[i]);
 					 return -ENOMEM;
 				  }
-					*/
+					
 
 				  myUrb[i]->dev = dev;
 				  myUrb[i]->context = dev;
 				  myUrb[i]->pipe = usb_rcvisocpipe(dev, endpointDesc.bEndpointAddress);
+				  myUrb[i]->transfer_flags = URB_ISO_ASAP | URB_NO_TRANSFER_DMA_MAP;
 				  myUrb[i]->interval = endpointDesc.bInterval;
-				  //myUrb[i]->transfer_flags = URB_ISO_ASAP | URB_NO_TRANSFER_DMA_MAP;
-				  myUrb[i]->transfer_flags = URB_ISO_ASAP;
-				  //myUrb[i]->transfer_buffer = cam->sts_buf[i];
-				  myUrb[i]->transfer_buffer = camdev->iso_in_buffer;
-				  myUrb[i]->complete = /** ... */;
-				  myUrb[i]->number_of_packets = /** ... */;
-				  myUrb[i]->transfer_buffer_length = /** ... */;
+				  myUrb[i]->complete = complete_callback;
+				  myUrb[i]->number_of_packets = nbPackets;
+				  myUrb[i]->transfer_buffer_length = myPacketSize;
 
 				  for (j = 0; j < nbPackets; ++j) {
 					 myUrb[i]->iso_frame_desc[j].offset = j * myPacketSize;
@@ -372,12 +445,12 @@ long cam_driver_ioctl(struct file *file, unsigned int cmd, unsigned long arg) {
 				}
 
 				for(i = 0; i < nbUrbs; i++){
-				  if ((ret = usb_submit_urb(/** ... */)) < 0) {
+				  if ((ret = usb_submit_urb(myUrb[i],GFP_ATOMIC)) < 0) {
 					 //printk(KERN_WARNING "");		
 					 return ret;
 				  }
-				}
-				 
+				printk(KERN_WARNING "cam_driver -> URB SENT\n");
+				
 			break;
 			}
 		case CAMERA_IOCTL_PANTILT:
