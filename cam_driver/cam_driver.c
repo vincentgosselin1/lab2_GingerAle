@@ -35,8 +35,8 @@ MODULE_LICENSE("Dual BSD/GPL");
 
 static struct usb_device_id usb_device_id [] = {
     //{USB_DEVICE(0x0000, 0x0000)},
-//	{USB_DEVICE(0x046d, 0x08cc)},
-	{USB_DEVICE(0x046d, 0x0994)},
+	{USB_DEVICE(0x046d, 0x08cc)},
+//	{USB_DEVICE(0x046d, 0x0994)},
     {},
 };
 MODULE_DEVICE_TABLE(usb, usb_device_id);
@@ -62,11 +62,14 @@ struct usb_skel {
 	//spinlock required?
 	spinlock_t command_spinlock; //locks commands to send.
 
-	//BULK Endpoints, buffers, URB.
-	char *bulk_in_buffer;
-	struct usb_endpoint_descriptor *bulk_in_endpoint;
-	struct urb *bulk_in_urb;
-	int bulk_in_running;
+	//ISOCHRONUS Endpoints, buffers, URB.
+	struct usb_endpoint_descriptor *iso_in_endpoint;
+	struct urb *iso_in_urb;
+	struct urb *myUrb;
+	int iso_in_running;
+	int iso_in_size;
+	int iso_in_endpointAddr;
+	char *iso_in_buffer;
 
 	//Control Endpoints, buffers, URB.
 	char *control_buffer; //8 bytes buffer for control messages.
@@ -131,7 +134,7 @@ static int __init cam_driver_init (void) {
 	CamCharDev.char_driver_cdev.owner = THIS_MODULE;
 
 	//cam_driver structure init.
-	
+	//camdev.myUrb = NULL;
 
 		//init custom structures
 
@@ -221,8 +224,15 @@ int cam_driver_probe(struct usb_interface *interface, const struct usb_device_id
 							printk(KERN_WARNING "cam_driver -> altSetNum is at 0x%x\n",altSetNum);
 							printk(KERN_WARNING "cam_driver -> dev->devnum is at : %d\n",dev->devnum);
 
+
 							camdev = kmalloc(sizeof(struct usb_skel), GFP_KERNEL);//alloue la structure locale du pilote.
 							camdev->usbdev = usb_get_dev(dev);
+
+							camdev->iso_in_size = endpoint->wMaxPacketSize;
+							printk(KERN_WARNING "cam_driver -> camdev->iso_in_size is at %d\n",camdev->iso_in_size);
+							camdev->iso_in_endpointAddr = endpoint->bEndpointAddress;
+
+							camdev->iso_in_buffer = kmalloc(sizeof(camdev->iso_in_size), GFP_KERNEL);
 
 							usb_set_intfdata(interface,camdev);
 							usb_register_dev(interface,&class_driver);
@@ -272,14 +282,15 @@ long cam_driver_ioctl(struct file *file, unsigned int cmd, unsigned long arg) {
 			break;
 		case CAMERA_IOCTL_STREAMON:
 			{
-			printk(KERN_WARNING "cam_driver -> CAMERA_IOCTL_STREAMON\n");
+			//printk(KERN_WARNING "cam_driver -> CAMERA_IOCTL_STREAMON\n");
 			unsigned long user_command,pipe;
+			printk(KERN_WARNING "cam_driver -> CAMERA_IOCTL_STREAMON\n");
 			printk(KERN_WARNING "cam_driver -> dev->devnum is at : %d\n",dev->devnum);
 			ret = __get_user(tmp, (int __user *)arg);
 			user_command = tmp;
-			printk(KERN_WARNING "cam_driver -> User sends : 0x%x\n",user_command);
+			//printk(KERN_WARNING "cam_driver -> User sends : 0x%x\n",user_command);
 			pipe = usb_sndctrlpipe(dev, 0);
-			printk(KERN_WARNING "cam_driver -> Pipe is : 0x%x\n",pipe);
+			//printk(KERN_WARNING "cam_driver -> Pipe is : 0x%d\n",pipe);
 			usb_control_msg(dev, pipe, 0x0b, 
 									USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_INTERFACE, 
 									0x0004, 0x0001, NULL, 0, 0);
@@ -287,27 +298,94 @@ long cam_driver_ioctl(struct file *file, unsigned int cmd, unsigned long arg) {
 			}
 		case CAMERA_IOCTL_STREAMOFF:
 			{
-			printk(KERN_WARNING "cam_driver -> CAMERA_IOCTL_STREAMOFF\n");
+			//printk(KERN_WARNING "cam_driver -> CAMERA_IOCTL_STREAMOFF\n");
 			unsigned long user_command,pipe;
+			printk(KERN_WARNING "cam_driver -> CAMERA_IOCTL_STREAMOFF\n");
 			printk(KERN_WARNING "cam_driver -> dev->devnum is at : %d\n",dev->devnum);
 			ret = __get_user(tmp, (int __user *)arg);
 			user_command = tmp;
-			printk(KERN_WARNING "cam_driver -> User sends : 0x%x\n",user_command);
+			//printk(KERN_WARNING "cam_driver -> User sends : 0x%d\n",user_command);
 			pipe = usb_sndctrlpipe(dev, 0);
-			printk(KERN_WARNING "cam_driver -> Pipe is : 0x%x\n",pipe);
+			//printk(KERN_WARNING "cam_driver -> Pipe is : 0x%d\n",pipe);
 			usb_control_msg(dev, pipe, 0x0b, 
 									USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_INTERFACE, 
 									0x0000, 0x0001, NULL, 0, 0);
 			break;
 			}
 		case CAMERA_IOCTL_GRAB:
+			{
 			printk(KERN_WARNING "cam_driver -> CAMERA_IOCTL_GRAB\n");
+			//Init URB
+			{
+				struct usb_host_interface * cur_altsetting;
+				struct usb_endpoint_descriptor endpointDesc;
+				struct urb myUrb[5];
+				
+				int nbPackets, myPacketSize,size,nbUrbs;
+				cur_altsetting = interface->cur_altsetting;
+				endpointDesc = cur_altsetting->endpoint[0].desc;
+
+				nbPackets = 40;  // The number of isochronous packets this urb should contain			
+				myPacketSize = le16_to_cpu(endpointDesc.wMaxPacketSize);
+				printk(KERN_WARNING "cam_driver -> myPacketSize is at : %d\n",myPacketSize);			
+				size = myPacketSize * nbPackets;
+				nbUrbs = 5;
+
+				//camdev has URB in its structure.
+
+				for (i = 0; i < nbUrbs; ++i) {
+					usb_free_urb(myUrb[i]); // Pour être certain
+					//is DMA involved?
+					myUrb[i] = usb_alloc_urb(nbPackets,GFP_ATOMIC);
+				 	 if (myUrb[i] == NULL) {
+					 	//printk(KERN_WARNING "");		
+						 return -ENOMEM;
+				  	}
+					
+				  //Isochronus transfer does not require usb_buffer_alloc, since not DMA.
+					/*
+				  myUrb[i]->transfer_buffer = usb_buffer_alloc(dev->udev,);
+
+				  if (myUrb[i]->transfer_buffer == NULL) {
+					 //printk(KERN_WARNING "");		
+					 usb_free_urb(myUrb[i]);
+					 return -ENOMEM;
+				  }
+					*/
+
+				  myUrb[i]->dev = dev;
+				  myUrb[i]->context = dev;
+				  myUrb[i]->pipe = usb_rcvisocpipe(dev, endpointDesc.bEndpointAddress);
+				  myUrb[i]->interval = endpointDesc.bInterval;
+				  //myUrb[i]->transfer_flags = URB_ISO_ASAP | URB_NO_TRANSFER_DMA_MAP;
+				  myUrb[i]->transfer_flags = URB_ISO_ASAP;
+				  //myUrb[i]->transfer_buffer = cam->sts_buf[i];
+				  myUrb[i]->transfer_buffer = camdev->iso_in_buffer;
+				  myUrb[i]->complete = /** ... */;
+				  myUrb[i]->number_of_packets = /** ... */;
+				  myUrb[i]->transfer_buffer_length = /** ... */;
+
+				  for (j = 0; j < nbPackets; ++j) {
+					 myUrb[i]->iso_frame_desc[j].offset = j * myPacketSize;
+					 myUrb[i]->iso_frame_desc[j].length = myPacketSize;
+				  }								
+				}
+
+				for(i = 0; i < nbUrbs; i++){
+				  if ((ret = usb_submit_urb(/** ... */)) < 0) {
+					 //printk(KERN_WARNING "");		
+					 return ret;
+				  }
+				}
+				 
 			break;
+			}
 		case CAMERA_IOCTL_PANTILT:
 			{
-			printk(KERN_WARNING "cam_driver -> CAMERA_IOCTL_PANTILT\n");
+			//printk(KERN_WARNING "cam_driver -> CAMERA_IOCTL_PANTILT\n");
 			//moving motors.
 			unsigned long user_command,pipe;
+			printk(KERN_WARNING "cam_driver -> CAMERA_IOCTL_PANTILT\n");
 			/*
 			int usb_control_msg(struct usb_device *dev, unsigned int pipe, __u8 request,
 		    __u8 requesttype, __u16 value, __u16 index, void *data,
@@ -315,9 +393,9 @@ long cam_driver_ioctl(struct file *file, unsigned int cmd, unsigned long arg) {
 			printk(KERN_WARNING "cam_driver -> dev->devnum is at : %d\n",dev->devnum);
 			ret = __get_user(tmp, (int __user *)arg);
 			user_command = tmp;
-			printk(KERN_WARNING "cam_driver -> User sends : 0x%x\n",user_command);
+			//printk(KERN_WARNING "cam_driver -> User sends : 0x%d\n",user_command);
 			pipe = usb_sndctrlpipe(dev, 0);
-			printk(KERN_WARNING "cam_driver -> Pipe is : 0x%x\n",pipe);
+			//printk(KERN_WARNING "cam_driver -> Pipe is : 0x%d\n",pipe);
 			usb_control_msg(dev, pipe, 0x01, 
 									USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE, 
 									0x0100, 0x0900, &user_command, 4, 0);
@@ -325,23 +403,27 @@ long cam_driver_ioctl(struct file *file, unsigned int cmd, unsigned long arg) {
 			break;
 			}
 		case CAMERA_IOCTL_PANTILT_RESET:
-			printk(KERN_WARNING "cam_driver -> CAMERA_IOCTL_PANTILT_RESET\n");
-			//moving motors.
-			unsigned long user_command,pipe;
-			/*
-			int usb_control_msg(struct usb_device *dev, unsigned int pipe, __u8 request,
-		    __u8 requesttype, __u16 value, __u16 index, void *data,
-		    __u16 size, int timeout)*/
-			printk(KERN_WARNING "cam_driver -> dev->devnum is at : %d\n",dev->devnum);
-			ret = __get_user(tmp, (int __user *)arg);
-			user_command = tmp;
-			printk(KERN_WARNING "cam_driver -> User sends : 0x%x\n",user_command);
-			pipe = usb_sndctrlpipe(dev, 0);
-			printk(KERN_WARNING "cam_driver -> Pipe is : 0x%x\n",pipe);
-			usb_control_msg(dev, pipe, 0x01, 
-									USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE, 
-									0x0200, 0x0900, &user_command, 1, 0);
+			{
+				//printk(KERN_WARNING "cam_driver -> CAMERA_IOCTL_PANTILT_RESET\n");
+				//moving motors.
+				unsigned long user_command;
+				unsigned long pipe;
+				printk(KERN_WARNING "cam_driver -> CAMERA_IOCTL_PANTILT_RESET\n");
+				/*
+				int usb_control_msg(struct usb_device *dev, unsigned int pipe, __u8 request,
+				 __u8 requesttype, __u16 value, __u16 index, void *data,
+				 __u16 size, int timeout)*/
+				printk(KERN_WARNING "cam_driver -> dev->devnum is at : %d\n",dev->devnum);
+				ret = __get_user(tmp, (int __user *)arg);
+				user_command = tmp;
+				//printk(KERN_WARNING "cam_driver -> User sends : 0x%d\n",user_command);
+				pipe = usb_sndctrlpipe(dev, 0);
+				//printk(KERN_WARNING "cam_driver -> Pipe is : 0x%d\n",pipe);
+				usb_control_msg(dev, pipe, 0x01, 
+										USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE, 
+										0x0200, 0x0900, &user_command, 1, 0);
 			break;
+			}
 	}
   return 0;
 }
