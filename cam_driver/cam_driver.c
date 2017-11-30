@@ -33,6 +33,10 @@
 
 MODULE_LICENSE("Dual BSD/GPL");
 
+
+//completion for allowing one thread to tell another that the job is done
+DECLARE_COMPLETION(my_completion);
+
 static struct usb_device_id usb_device_id [] = {
     //{USB_DEVICE(0x0000, 0x0000)},
 //	{USB_DEVICE(0x046d, 0x08cc)},
@@ -47,6 +51,8 @@ struct Cam_Dev {
 	struct class * char_driver_class;
 	dev_t devno;
 	struct cdev char_driver_cdev;
+	unsigned int myStatus, myLength, myLengthUsed;
+	char myData[42666];
 } CamCharDev;
 
 //structure pour binder les endpoints/alt-setting etc..
@@ -70,8 +76,8 @@ struct usb_skel {
 	int iso_in_size;
 	int iso_in_endpointAddr;
 	char *iso_in_buffer;
-	unsigned int myStatus, myLenght, myLenghtUsed;
-	char *myData;
+	//unsigned int myStatus, myLength, myLengthUsed;
+	//char myData[42666];
 	
 
 	//Control Endpoints, buffers, URB.
@@ -274,12 +280,12 @@ static void complete_callback(struct urb *urb){
 	unsigned int nbytes;
 	void * mem;
 
-	printk(KERN_WARNING "cam_driver -> complete_callback STARTS\n");
-	/*
+	//printk(KERN_WARNING "cam_driver -> complete_callback STARTS\n");
+	
 	if(urb->status == 0){
 		
 		for (i = 0; i < urb->number_of_packets; ++i) {
-			if(myStatus == 1){
+			if(CamCharDev.myStatus == 1){
 				continue;
 			}
 			if (urb->iso_frame_desc[i].status < 0) {
@@ -296,24 +302,24 @@ static void complete_callback(struct urb *urb){
 			}
 		
 			len -= data[0];
-			maxlen = myLength - myLengthUsed ;
-			mem = myData + myLengthUsed;
+			maxlen = CamCharDev.myLength - CamCharDev.myLengthUsed ;
+			mem = CamCharDev.myData + CamCharDev.myLengthUsed;
 			nbytes = min(len, maxlen);
 			memcpy(mem, data + data[0], nbytes);
-			myLengthUsed += nbytes;
+			CamCharDev.myLengthUsed += nbytes;
 	
 			if (len > maxlen) {				
-				myStatus = 1; // DONE
+				CamCharDev.myStatus = 1; // DONE
 			}
 	
 			//Mark the buffer as done if the EOF marker is set. 
 			
-			if ((data[1] & (1 << 1)) && (myLengthUsed != 0)) {						
-				myStatus = 1; // DONE
+			if ((data[1] & (1 << 1)) && (CamCharDev.myLengthUsed != 0)) {						
+				CamCharDev.myStatus = 1; // DONE
 			}					
 		}
 	
-		if (!(myStatus == 1)){				
+		if (!(CamCharDev.myStatus == 1)){				
 			if ((ret = usb_submit_urb(urb, GFP_ATOMIC)) < 0) {
 				//printk(KERN_WARNING "");
 			}
@@ -321,13 +327,22 @@ static void complete_callback(struct urb *urb){
 			///////////////////////////////////////////////////////////////////////
 			//  Synchronisation
 			///////////////////////////////////////////////////////////////////////
+			printk(KERN_WARNING "cam_driver -> Completion should be performed?\n");
+			//printk(KERN_WARNING "cam_driver -> isMyData filled with data?\n");
+			{
+			int j;
+				for(j=0;j<10;j++){
+					//printk(KERN_WARNING "cam_driver -> isMyData[%d] is : %c\n",j,CamCharDev.myData[j]);
+				}
+			}
+			
 		}			
 	}else{
 		//printk(KERN_WARNING "");
 	}
 
-	*/
-	printk(KERN_WARNING "cam_driver -> complete_callback DONE\n");
+	
+	//printk(KERN_WARNING "cam_driver -> complete_callback DONE\n");
 }
 
 
@@ -400,7 +415,14 @@ long cam_driver_ioctl(struct file *file, unsigned int cmd, unsigned long arg) {
 				unsigned int myPacketSize;
 				//dma_addr_t *dma = NULL;
 				//void * buf = NULL;//comme dans cours #5, p.13	
-					
+				
+
+				//Variables utilisee par la callback function 
+				CamCharDev.myStatus = 0;
+				CamCharDev.myLength = 42666;
+				CamCharDev.myLengthUsed = 0;
+				//CamCharDev.myData = {0};
+	
 				printk(KERN_WARNING "cam_driver -> CAMERA_IOCTL_GRAB\n");			
 
 				
