@@ -3,6 +3,7 @@
 //User program to interact with Char_driver.
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 //Required to interact with Linux core.
 #include <unistd.h>
@@ -14,6 +15,8 @@
 #include <asm/ioctl.h>
 #include "camera_ioctl.h"
 
+#include "dht_data.h"
+
 //used for user interaction.
 void display_welcome();
 void display_menu();
@@ -21,6 +24,7 @@ int scan_input();
 void execute(int choice);
 char user_text_input[256];	//used to put data into driver.
 char user_text_output[256]; //used to display data retrieved from driver.
+unsigned char image_buffer[42666];//used to get the image.
 
 //operation_done set to 1 when user is done with requesting.
 int operation_done = 0;
@@ -79,28 +83,98 @@ void execute(int choice){
 		//1 for READ
 		case 1 : 
 		{
-			//READING
-			printf("Testing file_operation READ \r\n");
-			//file descriptor used for driver interaction. 
-			int fd;
-			//Driver is called "etsele_cdev". 
-			fd = open("/dev/etsele_cdev", O_RDONLY);
-			if(fd<0){
-				printf("ERROR in OPENNING\r\n");
-			}
-			int ret;//return value of every read.
-			ret = read(fd, user_text_output, 1);
-			if(ret>0){ 
-				printf("Success in READING %d bytes\r\n",ret); 
-			} else {
-				printf("ERROR in READING\r\n");
-			}
+							/*
+							//READING
+							printf("Testing file_operation READ \r\n");
+							//file descriptor used for driver interaction. 
+							int fd;
+							//Driver is called "etsele_cdev". 
+							fd = open("/dev/etsele_cdev", O_RDONLY);
+							if(fd<0){
+								printf("ERROR in OPENNING\r\n");
+							}
+							int ret;//return value of every read.
+							//ret = read(fd, user_text_output, 1);
+							//image_buffer
+							ret = read(fd, image_buffer, 42666);
+							if(ret>0){ 
+								printf("Success in READING %d bytes\r\n",ret); 
+							} else {
+								printf("ERROR in READING\r\n");
+							}
 
-			//Close the file now.
-			//int ret;
-			ret = close(fd);
-			if(ret<0){
-				printf("ERROR in closing\r\n");
+							//Close the file now.
+							//int ret;
+							ret = close(fd);
+							if(ret<0){
+								printf("ERROR in closing\r\n");
+							}
+
+								{
+									int i;
+									for(i=0;i<100;i++){
+										printf("image_buffer[%d] is %c \r\n",i,image_buffer[i]); 
+									}
+								}
+							
+							break;
+							*/
+
+		
+		//Donnee
+		FILE *foutput;
+		unsigned char * inBuffer;
+		unsigned char * finalBuf;
+		
+		inBuffer = malloc((42666)* sizeof(unsigned char));
+		finalBuf = malloc((42666 * 2)* sizeof(unsigned char));
+
+		if((inBuffer == NULL) || (finalBuf == NULL)){
+			//return -1;
+		}
+
+		foutput = fopen("/home/ens/AK82770/Documents/ele784/labo2/cam_user/picture.jpg", "wb");
+		if(foutput != NULL){
+					{
+
+					int mySize;
+					//etape 2 CAMERA_IOCTL_STREAMON
+					int fd;
+					fd = open("/dev/etsele_cdev", O_RDWR);
+					int ret;
+					unsigned long value;//4 bytes -> 32bits.
+					value = 0xffff;
+					ret = ioctl(fd,CAMERA_IOCTL_STREAMON ,&value);//2nd parameter is the command associated, 3rd is pointer to unsigned long
+					printf("Return value is : %d\r\n",(int)value);
+					
+					//etape 3 CAMERA_IOCTL_GRAB
+					value = 0xaaaa;
+					ret = ioctl(fd,CAMERA_IOCTL_GRAB ,&value);//2nd parameter is the command associated, 3rd is pointer to unsigned long
+					printf("Return value is : %d\r\n",(int)value);
+
+					//etape 4 fonction read 
+					mySize = read(fd, inBuffer, 42666);
+
+					//etape 5 CAMERA_IOCTL_STREAMOFF
+					value = 0xaaaa;
+					ret = ioctl(fd,CAMERA_IOCTL_STREAMOFF ,&value);//2nd parameter is the command associated, 3rd is pointer to unsigned long
+					printf("Return value is : %d\r\n",(int)value);
+
+
+					//Close the file now.
+					//int ret;
+					ret = close(fd);
+						if(ret<0){
+							printf("ERROR in closing\r\n");
+						}
+					
+					
+					memcpy(finalBuf, inBuffer, HEADERFRAME1);
+					memcpy(finalBuf + HEADERFRAME1, dht_data, DHT_SIZE);
+					memcpy(finalBuf + HEADERFRAME1 + DHT_SIZE, inBuffer + HEADERFRAME1, (mySize - 	HEADERFRAME1));
+					fwrite(finalBuf, mySize + DHT_SIZE, 1, foutput);
+					fclose(foutput);
+					}
 			}
 			break;
 		}
